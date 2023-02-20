@@ -1,6 +1,6 @@
 /*
     DATA -: Sun-Feb 12 : 2023.
-    Written-by -: LOCALHOSTat127
+    Written-by -: 7HI2n9hsl02hHL@proton.me
 
     Purpose - : Basic DNS Client to query Standard record types.
 
