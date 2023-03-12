@@ -30,6 +30,7 @@
 #include<ctype.h>
 
 
+
 // userdefine typedefs using #define
 #define SOCKET int
 #define CLIENT_INIT main
@@ -54,6 +55,7 @@
 #define STANDARD_HEADER_SIZE 12 // Bytes
 #define PAYLOAD_SIZE 512         // Bytes
 #define RECEVE_BUFFER_SIZE 512
+#define SIMULATION 0  // ON : 1 | OFF : 0 
 
 
 // utils-variables.
@@ -251,8 +253,8 @@ void parseInput(char *DNS_QUERY_TEMPLATE, char *query){
     }
 
     // here...
-    // QUERY_STEPS =  STANDARD_HEADER_SIZE + QUERY_START_INDEX + 1;
-
+    QUERY_STEPS =  (QUERY_START_INDEX+6) - STANDARD_HEADER_SIZE;
+ 
 
     DNS_QUERY_TEMPLATE[QUERY_START_INDEX++] = 0; // Padding
     DNS_QUERY_TEMPLATE[QUERY_START_INDEX++] = 0;
@@ -397,7 +399,7 @@ void sendQuery(char* DNS_QUERY,struct addrinfo* DNSCONFIGPTR,char **query){
         exit(1);
     }
 
-    sleep(1);
+    sleep(1*SIMULATION);
     // SUCCESS - clientSocket created.
     printf("[*] :  ClientSocket created...\n");
     
@@ -410,19 +412,19 @@ void sendQuery(char* DNS_QUERY,struct addrinfo* DNSCONFIGPTR,char **query){
     
 
 
-    sleep(2);
+    sleep(2*SIMULATION);
     printf("[*] :  Trying to Connect...  %s@%s\n",(strlen(remoteHost) == 0 ?  SERVER_IN_USE : remoteHost),
                                                  (strlen(remoteHostService) == 0 ? SERVER_PORT : remoteHostService));
 
     
 
-    sleep(2);
+    sleep(2*SIMULATION);
     printf("[*] :  DNS-Server connection success...\n");
 
 
 
 
-    sleep(1);
+    sleep(1*SIMULATION);
     // sending DNS-Query
     printf("[*] :  Sending Query...\n");
     int temp = 0;
@@ -459,7 +461,7 @@ void sendQuery(char* DNS_QUERY,struct addrinfo* DNSCONFIGPTR,char **query){
         printf("   -|--------------------------------|-\n\n");
         printf("    Query -: %s\n",query[1]);
         printf("    RecordType -: %s\n",recordName);
-        sleep(2);
+        sleep(2*SIMULATION);
         printf("[*] :  waiting for response...\n");
     }
 
@@ -475,7 +477,6 @@ void sendQuery(char* DNS_QUERY,struct addrinfo* DNSCONFIGPTR,char **query){
     
     // free-up memory DNSCONFIGPTR.
     freeaddrinfo(DNSCONFIGPTR);
-
 }
 
 int binToDec(int* bin_stream,const int nSize){
@@ -531,6 +532,8 @@ void processResponse(unsigned char *DNS_RESPONSE,const int RESPONSE_SIZE){
     }
 
 
+
+    // =============================== Header Section ==========================================
     // validating response flags.
     char hex_stream[] = {DNS_RESPONSE[2],DNS_RESPONSE[3]};
     int hex_stream_size = sizeof(hex_stream)/sizeof(hex_stream[0]);
@@ -571,10 +574,25 @@ void processResponse(unsigned char *DNS_RESPONSE,const int RESPONSE_SIZE){
 
 
 
+    
 
-    QUERY_STEPS = 11;
+    // =============================== Validate Response Code [START] ============================================
+
+
+    // here...
+
+
+
+    // =============================== Validate Response Code [END] ==============================================
+
+
+
+
+
+
+    // =============================== Ans Section ==========================================
     // skipping over the query section and padding and type + class.
-    int currentCounter = (QUERY_STEPS + 11 + 2 + 4);
+    int currentCounter = (QUERY_STEPS  + 11);
     DNS_RESPONSE_.answers = NULL;
     
 
@@ -591,46 +609,82 @@ void processResponse(unsigned char *DNS_RESPONSE,const int RESPONSE_SIZE){
         
         // skipping pointer bytes...
         currentCounter +=2;
-        newNode->type = DNS_RESPONSE[++currentCounter] + DNS_RESPONSE[++currentCounter];
-        newNode->class = DNS_RESPONSE[currentCounter] + DNS_RESPONSE[++currentCounter];
-        newNode->TTL += DNS_RESPONSE[++currentCounter];
-        newNode->TTL += DNS_RESPONSE[++currentCounter];
-        newNode->TTL += DNS_RESPONSE[++currentCounter];
-        newNode->TTL += DNS_RESPONSE[++currentCounter];
-        
-         printf("%d BC\n",currentCounter);
-        // currentCounter++;
-        //--- TODO : Upgrade code for ipv6 array size to hold more values...
-        int ipsize = DNS_RESPONSE[currentCounter]  + DNS_RESPONSE[++currentCounter];
-        printf("%x C\n",DNS_RESPONSE[37]);
+        newNode->type += DNS_RESPONSE[currentCounter];
+        newNode->type +=  DNS_RESPONSE[++currentCounter];
     
-
-        currentCounter++;
-
-        printf("%d %d\n",currentCounter,ipsize);
+        newNode->class += DNS_RESPONSE[++currentCounter];
+        newNode->class += DNS_RESPONSE[++currentCounter];
         
-        // for(int i=0; i<ipsize; i++){
-        //     newNode->ip[i] = DNS_RESPONSE[currentCounter];
-        //     currentCounter++;
-        // }
+        newNode->TTL += DNS_RESPONSE[++currentCounter];
+        newNode->TTL += DNS_RESPONSE[++currentCounter];
+        newNode->TTL += DNS_RESPONSE[++currentCounter];
+        newNode->TTL += DNS_RESPONSE[++currentCounter];
 
+         
+
+        //--- TODO : Upgrade code for ipv6 array size to hold more values...
+        int ipsize = DNS_RESPONSE[++currentCounter]  + DNS_RESPONSE[++currentCounter];
         
-        currentCounter++;
+        for(int i=0; i<ipsize; i++){
+            newNode->ip[i] = DNS_RESPONSE[++currentCounter];
+        }
+        currentCounter++;   
     }
 
 
 
-        for(int i=0; i<4; i++){
-            printf("%d.",DNS_RESPONSE_.answers  ->ip[i]);
-        }
-    // printf("%d\n",DNS_RESPONSE_.ANSCOUNT);
-    // printf("%d.",DNS_RESPONSE_.ANSCOUNT);
+    // clear-cli-prompt
+    char  isClearScreen = 'N';
+    printf("[^] Do you want to clear Previous output.[Y/N] : ");
+    scanf("%c",&isClearScreen);
+    if(isClearScreen == 'Y' || isClearScreen == 'y'){
+        system("clear");
+    }
     
 
+    // Displaying output.
+    printf("\n===> Response : Received %d Bytes \n",RESPONSE_SIZE);
+    printf("[*] :  Header\n");
+    printf("   -|---------------------------------------------------------------------------------------|-\n");
+    printf("   -|                                      %s                                           |-\n","0xABCD");
+    printf("   -|---------------------------------------------------------------------------------------|-\n");
+    printf("   -| QR:%d | OPCODE:%d | AA:%d | TNQ:%d  | RA:%d  | RD:%d  | isAuth:%d  | isAuthReq:%d  | RECODE:%d |\n",DNS_RESPONSE_.isValidResponse,DNS_RESPONSE_.OPCODE,DNS_RESPONSE_.isAutherativeServer,DNS_RESPONSE_.isTruncated,DNS_RESPONSE_.isRecurssionAvailable,DNS_RESPONSE_.isRecurssionDesired,DNS_RESPONSE_.isResponseAuthencated,DNS_RESPONSE_.isAuthRequired,DNS_RESPONSE_.responseCode);
+    printf("   -|---------------------------------------------------------------------------------------|-\n");
+    printf("   -|                                     QACOUNT :%d                                        |-\n",DNS_RESPONSE_.QACOUNT);
+    printf("   -|---------------------------------------------------------------------------------------|-\n");
+    printf("   -|                                     ANCOUNT :%d                                        |-\n",DNS_RESPONSE_.ANSCOUNT);
+    printf("   -|---------------------------------------------------------------------------------------|-\n");
+    printf("   -|                                     NSCOUNT :%d                                        |-\n",DNS_RESPONSE_.NSCOUNT);
+    printf("   -|---------------------------------------------------------------------------------------|-\n");
+    printf("   -|                                     ARCOUNT :%d                                        |-\n",DNS_RESPONSE_.ARCOUNT);
+    printf("   -|---------------------------------------------------------------------------------------|-\n");
+
+    printf("[*] : %d Answers\n",DNS_RESPONSE_.ANSCOUNT);
+    struct DNS_answer* TEMP = DNS_RESPONSE_.answers;
+    struct DNS_answer* USED = NULL;
+    while(DNS_RESPONSE_.answers != NULL){
+        printf("       IPV4 : ");
+        for(int i=0; i<4; i++){
+            if(i <= 2){
+                printf("%d.",TEMP->ip[i]);
+            }else{
+                printf("%d",TEMP->ip[i]);
+            }
+        }
+
+        printf("\n");
+
+        // freed-up memory.
+        USED = TEMP;
+        TEMP = TEMP->Next;
+        DNS_RESPONSE_.answers = TEMP;
+        free(USED);
+    }
 
 
+
+    // ===-> End of processResponse.
 }
-
 
 
 
